@@ -2,6 +2,7 @@ package maps
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -126,6 +127,58 @@ func NewReader(reader io.Reader) Reader {
 	}
 }
 
+// a wrapper function designed to trim the results of ReadBytes in place
+func trimInPlace(b []byte, err error) ([]byte, error) {
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
+	// Remove spacing on the left (common in tests) and the delim on the right
+	// Can't use bytes.Trim because this edits the underlying buffer
+	skip := bytes.LastIndexAny(b, " \t")
+	b = b[skip+1:]
+	if len(b) == 0 {
+		return nil, errors.New("empty row")
+	}
+	if b[len(b)-1] == '\n' {
+		b = b[:len(b)-1]
+	}
+
+	return b, nil
+}
+
+func sanitizeCells(m *Map) error {
+	m.PointsOfInterest = make([]Vertex, 1)
+	foundStart := false
+
+	for ir, row := range m.Cells {
+		for ic, val := range row {
+			v := Vertex{Row: ir, Col: ic}
+			switch val {
+			case Wall, Space:
+				continue
+			case Start:
+				if foundStart {
+					return fmt.Errorf("Reader.Next(): found second starting location at %s", v)
+				}
+				foundStart = true
+				m.PointsOfInterest[0] = v
+			default:
+				if val < '0' || val > '9' {
+					return fmt.Errorf("Reader.Next(): unknown rune %c at column %d of row %d (%s)", val, v.Col, v.Row, string(row))
+				}
+				fallthrough
+			case Pickaxe:
+				m.PointsOfInterest = append(m.PointsOfInterest, v)
+			}
+		}
+	}
+
+	if !foundStart {
+		return errors.New("Reader.Next(): did not find starting location")
+	}
+	return nil
+}
+
 // Next reads the next map from the io.Reader. Returns io.EOF if
 // the io.Reader has terminated.
 func (r *Reader) Next() (Map, error) {
@@ -140,6 +193,7 @@ func (r *Reader) Next() (Map, error) {
 		if err != nil {
 			return m, err // err can be io.EOF and that's OK
 		}
+		header = strings.TrimLeft(header, " \t")
 		if header != "\n" {
 			break
 		}
@@ -153,45 +207,20 @@ func (r *Reader) Next() (Map, error) {
 	// Sanitize that all header values must be >= 1?
 
 	// Start with size 1 because we'll insert the start location but otherwise append
-	m.PointsOfInterest = make([]Vertex, 1)
 	m.Cells = make([][]byte, height)
-	foundStart := false
 	for row := 0; row < height; row++ {
-		m.Cells[row], err = r.reader.ReadBytes('\n')
-		if err != nil {
+		m.Cells[row], err = trimInPlace(r.reader.ReadBytes('\n'))
+		if err != nil && err != io.EOF {
 			return m, fmt.Errorf("Reader.Next(): failed to read row %d", row)
 		}
-		// ReadString includes the delim
-		m.Cells[row] = m.Cells[row][0 : len(m.Cells[row])-1]
 		if len(m.Cells[row]) != width {
 			return m, fmt.Errorf("Reader.Next(): row %d (%s); expected %d columns got %d", row, string(m.Cells[row]), width, len(m.Cells[row]))
 		}
-		for col, val := range m.Cells[row] {
-			v := Vertex{Row: row, Col: col}
-			switch val {
-			case Wall, Space:
-				continue
-			case Start:
-				if foundStart {
-					return m, fmt.Errorf("Reader.Next(): found second starting location at %s", v)
-				}
-				foundStart = true
-				m.PointsOfInterest[0] = v
-			default:
-				if val < '0' || val > '9' {
-					return m, fmt.Errorf("Reader.Next(): unknown rune %c at column %d of row %d (%s)", val, v.Col, v.Row, string(m.Cells[row]))
-				}
-				fallthrough
-			case Pickaxe:
-				m.PointsOfInterest = append(m.PointsOfInterest, v)
-			}
-		}
 	}
 
-	if !foundStart {
-		return m, errors.New("Reader.Next(): did not find starting location")
+	if err = sanitizeCells(&m); err != nil {
+		return m, err
 	}
-
 	return m, nil
 }
 

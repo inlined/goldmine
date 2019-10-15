@@ -1,7 +1,6 @@
 package maps_test
 
 import (
-	"bufio"
 	"io"
 	"strings"
 	"testing"
@@ -10,20 +9,17 @@ import (
 	"github.com/inlined/goldmine/pkg/maps"
 )
 
-// Test data uses `literals`; this function
-// trims left spacing to avoid messy test code
-func reformatTestMap(m string) string {
-	scanner := bufio.NewScanner(strings.NewReader(m))
-	b := strings.Builder{}
-	for scanner.Scan() {
-		l := scanner.Text()
-		l = strings.TrimLeft(l, "\t ")
-		b.WriteString(l)
-		b.WriteByte('\n')
+// normalize turns a test string into the output format expected
+// by a map seraizliation. This allows a sort of whitespace
+// insensitive compare.
+func normalize(m string) string {
+	trimmed := strings.ReplaceAll(m, " ", "")
+	trimmed = strings.ReplaceAll(m, "\t", "")
+	if trimmed[len(trimmed)-1] != '\n' {
+		trimmed = trimmed + "\n"
 	}
-	return b.String()
+	return trimmed
 }
-
 func coordinates(rowsAndCols ...int) []maps.Vertex {
 	v := make([]maps.Vertex, len(rowsAndCols)/2)
 	for i := 0; i < len(v); i++ {
@@ -57,7 +53,7 @@ func TestMaps(t *testing.T) {
 			poi:   coordinates(1, 1, 0, 1),
 			steps: 2,
 		}, {
-			tag: "row mismatch",
+			tag: "col mismatch",
 			m: `=2,2,2
 				w
 				.s`,
@@ -73,7 +69,7 @@ func TestMaps(t *testing.T) {
 				.s`,
 			err: "Reader.Next(): expected header of '=<height>,<width>,<moves>'",
 		}, {
-			tag: "col mismatch",
+			tag: "row mismatch",
 			m: `=2,2,2
 				w.`,
 			err: "Reader.Next(): failed to read row 1",
@@ -98,8 +94,7 @@ func TestMaps(t *testing.T) {
 		},
 	} {
 		t.Run(test.tag, func(t *testing.T) {
-			m := reformatTestMap(test.m)
-			r := maps.NewReader(strings.NewReader(m))
+			r := maps.NewReader(strings.NewReader(test.m))
 			parsed, err := r.Next()
 			if test.err != "" {
 				if err == nil {
@@ -123,8 +118,9 @@ func TestMaps(t *testing.T) {
 			}
 
 			s := parsed.String()
-			if s != m {
-				t.Errorf("Round trip serialization failed; got=%s; want=%s; diff=%s", s, m, cmp.Diff(s, m))
+			n := normalize(test.m)
+			if s != n {
+				t.Errorf("Round trip serialization failed; got=%s; want=%s; diff=%s", s, n, cmp.Diff(s, n))
 			}
 		})
 	}
@@ -139,7 +135,7 @@ func TestReadRepeatedly(t *testing.T) {
 		 s
 		 
 		 `
-	r := maps.NewReader(strings.NewReader(reformatTestMap(s)))
+	r := maps.NewReader(strings.NewReader(s))
 
 	expected1 := maps.Map{
 		PointsOfInterest: coordinates(1, 0),
@@ -192,11 +188,10 @@ func TestPathManipulation(t *testing.T) {
 }
 
 func TestPathTraversal(t *testing.T) {
-	s := reformatTestMap(`
-	=3,5,5
-	w...1
-	..s..
-	2d1..`)
+	s := `=3,5,5
+ 	      w...1
+	      ..s..
+	      2d1..`
 	r := maps.NewReader(strings.NewReader(s))
 	m, err := r.Next()
 	if err != nil {
@@ -266,11 +261,10 @@ func TestPathTraversal(t *testing.T) {
 }
 
 func TestPadding(t *testing.T) {
-	s := reformatTestMap(`
-	=3,5,5
-	.w.w.
-	w.s.w
-	.w.w.`)
+	s := `=3,5,5
+		  .w.w.
+		  w.s.w
+		  .w.w.`
 	r := maps.NewReader(strings.NewReader(s))
 	m, err := r.Next()
 	if err != nil {
