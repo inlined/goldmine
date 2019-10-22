@@ -175,15 +175,16 @@ func TestReadRepeatedly(t *testing.T) {
 }
 
 func TestPathManipulation(t *testing.T) {
-	p := maps.ParsePath("uuddlrlr")
-	if p.String() != "uuddlrlr" {
-		t.Errorf("Round trip parse and encode got %s; expected uuddlrlr", p.String())
+	p1 := maps.ParsePath("uuddlrlr")
+	p2 := maps.ParsePath("uuddlrlr")
+	if p1.String() != "uuddlrlr" {
+		t.Errorf("Round trip parse and encode got %s; expected uuddlrlr", p1.String())
 	}
 
-	p2 := p.Concat('u')
-	p.Append('u')
-	if p.String() != p2.String() {
-		t.Errorf("Concat vs Append 'd'; got %s vs %s", p2, p)
+	p1.Concat(maps.Path("u"))
+	p2.Append('u')
+	if p1.String() != p2.String() {
+		t.Errorf("Concat vs Append 'd'; got %s vs %s", p2, p1)
 	}
 }
 

@@ -7,12 +7,15 @@ import (
 	"os"
 
 	"github.com/inlined/genetics"
+	"github.com/inlined/rand"
+
+	"github.com/inlined/goldmine/pkg/debug"
 	"github.com/inlined/goldmine/pkg/maps"
 	"github.com/inlined/goldmine/pkg/solver"
-	"github.com/inlined/rand"
 
 	// Import for flag side-effects
 	_ "github.com/inlined/goldmine/pkg/bruteforce"
+	_ "github.com/inlined/goldmine/pkg/graph"
 )
 
 var (
@@ -34,6 +37,7 @@ func init() {
 	flag.Var(&crossoverFlag, "crossover", "genetic crossover strategy for creating children")
 	flag.Var(&mutationFlag, "mutation", "mutations new children may exhibit")
 	flag.Var(&solverFlag, "strategy", "Strategy used to solve goldmine maps")
+	flag.Var(debug.Flag, "debug", "Debug location or file descriptor; empty to turn off debugging")
 }
 
 func main() {
@@ -84,15 +88,17 @@ func main() {
 	const numSteps = 1000
 	const sampleRate = 10
 	for i, s := range solvers {
-		fmt.Println("Map", i)
-		s.Init(*populationSize)
+		fmt.Fprintf(debug.Out, "Map %d\n", i)
+		if err := s.Init(*populationSize); err != nil {
+			panic(fmt.Sprintf("Could not initializes solver:%s", err))
+		}
 		for x := 0; x < numSteps; x++ {
 			s.Step(stepCount)
 			if (x+1)%sampleRate == 0 {
-				fmt.Printf("%d,", s.Score())
+				fmt.Fprintf(debug.Out, "%d,", s.Score())
 			}
 		}
-		fmt.Printf("\n%s\n\n", s.Path())
-		fmt.Fprintln(out, s.Path())
+		fmt.Fprintf(debug.Out, "\n%s\n\n", s.Path(s.Best()))
+		fmt.Fprintln(out, s.Path(s.Best()))
 	}
 }

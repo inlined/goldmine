@@ -19,8 +19,9 @@ var (
 type Solver interface {
 	Init(popSize int) error
 	Step(count int)
+	Path(genetics.Chromosome) maps.Path
 	Score() int
-	Path() maps.Path
+	Best() genetics.Chromosome
 }
 
 // Input is used to create a solver
@@ -46,6 +47,7 @@ func (f *Flag) Set(s string) error {
 	if _, ok := factories[s]; !ok {
 		return fmt.Errorf("solver.Flag.Set(%s) unknown solver %s", s, s)
 	}
+	*f = Flag(s)
 
 	return nil
 }

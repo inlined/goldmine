@@ -115,6 +115,11 @@ func (m Map) CanBeAt(v Vertex) bool {
 	return inBounds && m.At(v) != Wall
 }
 
+// Interesting declares whether v is a point of interest.
+func (m Map) Interesting(v Vertex) bool {
+	return m.CanBeAt(v) && m.At(v) != Space
+}
+
 // Reader parses a map from an io.Reader
 type Reader struct {
 	reader *bufio.Reader
@@ -247,13 +252,24 @@ func (p *Path) Append(d Direction) {
 	*p = append(*p, d)
 }
 
-// Concat creates a new path with N directions appended
-func (p Path) Concat(d ...Direction) Path {
-	p2 := make([]Direction, 0, len(p)+len(d))
+// Push is like append but creates a new path
+func (p Path) Push(d Direction) Path {
+	var p2 Path
 	p2 = append(p2, p...)
-	p2 = append(p2, d...)
-	return Path(p2)
+	p2 = append(p2, d)
+	return p2
+}
 
+// Concat adds another pat onto the end of this one
+func (p *Path) Concat(p2 Path) {
+	*p = append(*p, p2...)
+}
+
+// Copy creates another path to work with
+func (p Path) Copy() Path {
+	var p2 Path
+	p2 = append([]Direction(nil), p...)
+	return p2
 }
 
 // EndingVertex returns the final location after following a path on a map

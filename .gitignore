@@ -13,3 +13,9 @@
 
 # Mac files
 .DS_Store
+
+# Solution files
+data/*.answer
+
+# IDE files
+.vscode

@@ -43,14 +43,15 @@ func toDir(g genetics.Gene) maps.Direction {
 	}
 }
 
-func allowablePath(c genetics.Chromosome, m maps.Map) maps.Path {
-	p := maps.Path(make([]maps.Direction, 0, m.StepsAllowed))
-	v := m.PointsOfInterest[0]
+// Path transaltes a Chromosome into a valid Path
+func (s Solver) Path(c genetics.Chromosome) maps.Path {
+	p := maps.Path(make([]maps.Direction, 0, s.Map.StepsAllowed))
+	v := s.Map.PointsOfInterest[0]
 
-	for i := 0; i < c.Species.NumGenes && p.Len() <= m.StepsAllowed; i++ {
+	for i := 0; i < c.Species.NumGenes && p.Len() <= s.Map.StepsAllowed; i++ {
 		d := toDir(c.Genes[i])
 		v2 := v.Move(d)
-		if !m.CanBeAt(v2) {
+		if !s.Map.CanBeAt(v2) {
 			continue
 		}
 		p.Append(d)
@@ -58,7 +59,7 @@ func allowablePath(c genetics.Chromosome, m maps.Map) maps.Path {
 	}
 
 	// In case we run out of valid genes before StepsAllowed
-	p.Pad(m)
+	p.Pad(s.Map)
 	return p
 }
 
@@ -80,7 +81,7 @@ func (s *Solver) Step(count int) {
 	fitness := make([]genetics.Fitness, len(s.population))
 	for i := 0; i < count; i++ {
 		for n, c := range s.population {
-			p := allowablePath(c, s.Map)
+			p := s.Path(c)
 			score := p.Score(s.Map)
 			fitness[n] = genetics.Fitness(score)
 			if score > s.score {
@@ -97,7 +98,7 @@ func (s *Solver) Score() int {
 	return s.score
 }
 
-// Path accesses the path that leads to the current best score
-func (s *Solver) Path() maps.Path {
-	return allowablePath(s.best, s.Map)
+// Best returns the winning chromosome.
+func (s *Solver) Best() genetics.Chromosome {
+	return s.best
 }
